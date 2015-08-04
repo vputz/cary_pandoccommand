@@ -1,4 +1,4 @@
-Cary-pandoccommand
+Cary_pandoccommand
 -------------------
 
 A simple cary command to run the unix `pandoc` command.  Obviously
