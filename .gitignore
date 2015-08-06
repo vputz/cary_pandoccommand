@@ -2,3 +2,5 @@
 *~
 *.msg
 
+.tox
+*.egg-info
