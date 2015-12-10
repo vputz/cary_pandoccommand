@@ -6,44 +6,20 @@ import shutil
 import os
 
 
+
 @scenario('pandoccommand.feature', 'Basic pandoc command')
 def test_pandoc_command():
     pass
 
-
-@given('an email message with a body and attachments')
-def pandocaction(request):
-    message_text = """                                                                                                                                                                                                                                                               
-MIME-Version: 1.0
-Sender: vbputz@gmail.com
-Received: by 10.96.179.170 with HTTP; Thu, 2 Jul 2015 08:33:57 -0700 (PDT)
-Date: Thu, 2 Jul 2015 15:33:57 +0000
-Delivered-To: vbputz@gmail.com
-X-Google-Sender-Auth: xsC_n76tVTZgoqsWPaj9URbCxF0
-Message-ID: <CADsvd-RzBFwFkMHtaHmvNTK4-Upkv3X+VD3XfJMka5=Z4wn9Ow@mail.gmail.com>
-Subject: pandoc
-From: Vic Putz <vputz@nyx.net>
-To: Vic Putz <vbputz@gmail.com>
-Content-Type: multipart/mixed; boundary=001a11c132f8fbf47b0519e62a97
-
---001a11c132f8fbf47b0519e62a97
-Content-Type: text/plain; charset=UTF-8
-
-
-
---001a11c132f8fbf47b0519e62a97
-Content-Type: text/markdown; charset=US-ASCII; name="test.md"
-Content-Disposition: attachment; filename="test.md"
-Content-Transfer-Encoding: base64
-X-Attachment-Id: f_ibmew1tz0
-
-VGVzdCBNYXJrZG93bgotLS0tLS0tLS0tLS0tCgpUZXN0IG1hcmtkb3duIQo=
---001a11c132f8fbf47b0519e62a97--"""
+@given('an email message <filename>')
+def pandocaction(request, filename):
+    message_text = compdata(filename).decode("utf-8")
     tempworkingdir = tempfile.mkdtemp()
     os.mkdir(os.path.join(tempworkingdir, "transactions"))
 
     def fin():
-        shutil.rmtree(tempworkingdir)
+        pass
+        #shutil.rmtree(tempworkingdir)
     request.addfinalizer(fin)
     result = PandocAction(ParsedEmail(message_text))
     result.set_config(dict(PANDOC_PATH='/usr/bin/pandoc',
@@ -53,17 +29,26 @@ VGVzdCBNYXJrZG93bgotLS0tLS0tLS0tLS0tCgpUZXN0IG1hcmtkb3duIQo=
     return result
 
 
+def compdata(fnam):
+    to_testfiles = os.path.abspath(
+        os.path.join(os.path.split(__file__)[0], "test_data"))
+    path = os.path.join(to_testfiles, fnam)
+    with open(path, "rb") as f:
+        result = f.read()
+    return result
+
+
 @then('the action should execute')
 def execute_action(pandocaction):
     pandocaction.execute()
+    if not pandocaction.command_is_valid:
+        print(pandocaction.invalid_command_response)
+    assert pandocaction.command_is_valid
 
 
-@then('create transcribed documents')
-def check_output_attachments(pandocaction):
-    expected = """<h2 id="test-markdown">Test Markdown</h2>
-<p>Test markdown!</p>
-"""
-    attachments = [('test.html', expected)]
+@then('create a transcribed <document>')
+def check_output_attachments(pandocaction, document):
+    attachments = [(document, compdata(document))]
     check_attachments(pandocaction.output_dir, attachments)
 
 
@@ -84,6 +69,6 @@ attachments = [("text_1", "Hello, text 1!\n"),
 def check_attachments(base_path, attachments):
     for attachment in attachments:
         fnam = os.path.join(base_path, attachment[0])
-        with open(fnam) as f:
+        with open(fnam, "rb") as f:
             contents = f.read()
             assert attachment[1] == contents

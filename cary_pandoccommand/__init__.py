@@ -32,8 +32,20 @@ class PandocAction(CaryAction):
 
     def validate_command(self):
         # pandoc should at least have one attachment and we hope it is valid markdown
+        self.command_is_valid = False
         if len(self._attachments) > 0:
-            self.command_is_valid = True
+            if len (self._attachments) == 1:
+                self.command_is_valid = True
+            else:
+                for attachment in self._attachments:
+                    fnam_root, fnam_ext = os.path.splitext(os.path.split(attachment)[-1])
+                    if fnam_ext == ".md":
+                        self.command_is_valid = True
+                if not self.command_is_valid:
+                    self.invalid_command_response = """
+I'm sorry, pandoc with multiple files requires one of them to have a markdown (.md) suffix.
+"""
+                
         else:
             self.invalid_command_response = """
 I'm sorry, pandoc requires an input document, and I did not see one in your email.
@@ -49,18 +61,32 @@ I'm sorry, pandoc requires an input document, and I did not see one in your emai
             self.convert_to(filetype, suffix)
 
     def output_path(self, suffix):
-        base_fnam = os.path.split(self._attachments[0])[-1]
+        base_fnam = os.path.split(self.source_file())[-1]
         fnam_root, fnam_ext = os.path.splitext(base_fnam)
         return os.path.join(self.output_dir, fnam_root+"."+suffix)
 
+    def source_file(self):
+        result = None
+        if len(self._attachments) == 1:
+            result = self._attachments[0]
+        else:
+            for attachment in self._attachments:
+                fnam_root, fnam_ext = os.path.splitext(os.path.split(attachment)[-1])
+                if fnam_ext == ".md":
+                    result = attachment
+        return result
+
     def convert_to(self, filetype, suffix):
-        source = self._attachments[0]
+        source = self.source_file()
+        print("SOURCE FILE "+self.source_file())
+        print("WD " + self.working_dir)
         target = self.output_path(suffix)
         command_list = [self.config['PANDOC_PATH'],
                         '-f', 'markdown', '-t', filetype, '-o',
                         target, source]
         self._output_filenames.append(target)
-        call_result = call(command_list, env=self.execution_environment())
+        call_result = call(command_list, env=self.execution_environment(), 
+                           cwd=os.path.join(self.working_dir, "input"))
         logging.log(logging.INFO, " ".join(command_list)
                     + "::" + str(call_result) + "\n")
 
